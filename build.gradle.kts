@@ -2,10 +2,9 @@ plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.1.20"
     id("org.jetbrains.intellij.platform") version "2.10.2"
-    id("org.jetbrains.kotlin.plugin.compose") version "2.1.20"
 }
 
-group = "com.example"
+group = "com.gitmemo"
 version = "1.0-SNAPSHOT"
 
 repositories {
@@ -21,12 +20,15 @@ dependencies {
         intellijIdea("2025.2.4")
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
 
-        // Add plugin dependencies for compilation here:
+        bundledPlugin("Git4Idea")
+        // Optional at runtime (see plugin.xml), but needed on the compile classpath for the
+        // Claude Code bridge, which writes into the Claude session's terminal.
+        bundledPlugin("org.jetbrains.plugins.terminal")
 
-        composeUI()
-
-        bundledPlugin("com.intellij.modules.json")
-        bundledPlugin("org.intellij.plugins.markdown")
+        // Not a dependency of this plugin — nothing here compiles against it. It is here only so the
+        // runIde sandbox has the same Claude Code session the bridge targets in a real IDE, which
+        // otherwise cannot be tested at all.
+        plugin("com.anthropic.code.plugin:0.1.14-beta")
     }
 }
 
@@ -39,6 +41,13 @@ intellijPlatform {
         changeNotes = """
             Initial version
         """.trimIndent()
+    }
+
+    pluginVerification {
+        ides {
+            // Verify against the IDE we compile against.
+            ide(org.jetbrains.intellij.platform.gradle.IntelliJPlatformType.IntellijIdeaUltimate, "2025.2.4")
+        }
     }
 }
 

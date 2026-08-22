@@ -1,0 +1,10 @@
+<!--
+  Config file for the optional dependency on org.jetbrains.plugins.terminal.
+
+  Intentionally empty: the dependency exists only so the terminal plugin's classes are on our
+  classloader for com.gitmemo.claude.ClaudeCodeBridge, which needs no extra registrations. The
+  platform requires a config-file on an optional <depends>, and the plugin verifier reports a
+  structure defect without one.
+-->
+<idea-plugin>
+</idea-plugin>

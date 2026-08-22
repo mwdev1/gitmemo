@@ -1,33 +1,71 @@
 <!-- Plugin Configuration File: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
-    <!-- Unique identifier of the plugin. It should be FQN, cannot be changed between the plugin versions. -->
-    <id>com.example.gitmemo</id>
+    <id>com.gitmemo.notes</id>
+    <name>Git Notes</name>
+    <vendor>gitmemo</vendor>
 
-    <!-- Public plugin name should be written in Title Case.
-         Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-name -->
-    <name>Gitmemo</name>
-
-    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-    <vendor url="https://www.yourcompany.com">YourCompany</vendor>
-
-    <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
-         Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
     <description><![CDATA[
-        Enter short description for your plugin here.<br>
-        <em>most HTML tags may be used</em>
+        View, add, edit and delete <b>git notes</b> on commits, straight from the VCS Log.<br><br>
+        Git notes live outside the commit object graph, so the bundled Git plugin does not surface them
+        at all. This plugin adds:
+        <ul>
+            <li>a note indicator in the commit details panel of the Log, which opens an editor when clicked;</li>
+            <li>a <b>Git Notes</b> tool window that follows the Log selection and edits notes inline;</li>
+            <li><b>Notes</b> actions in the Log context menu, including fetch and push of the notes refs;</li>
+            <li>a configurable notes namespace, for reviews or other custom refs.</li>
+        </ul>
     ]]></description>
 
-    <!-- Product and plugin compatibility requirements.
-         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
-    <depends>com.intellij.modules.compose</depends>
+    <depends>com.intellij.modules.vcs</depends>
+    <depends>Git4Idea</depends>
+    <!-- Optional: only the "Send to Claude Code" button needs the terminal, and note editing must keep
+         working when a user disables the terminal plugin. -->
+    <depends optional="true" config-file="gitmemo-terminal.xml">org.jetbrains.plugins.terminal</depends>
 
-    <depends>com.intellij.modules.json</depends>
-    <depends>org.intellij.plugins.markdown</depends>
-    <resource-bundle>messages.MyMessageBundle</resource-bundle>
-    <!-- Extensions defined by the plugin.
-         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
+    <resource-bundle>messages.GitMemoBundle</resource-bundle>
+
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow id="MyToolWindow" factoryClass="com.example.gitmemo.MyToolWindowFactory"
-                    icon="AllIcons.Toolwindows.ToolWindowPalette"/>
+        <!-- GitNotesService and GitMemoSettings are light services (@Service) and must not be
+             registered here. -->
+
+        <projectConfigurable id="gitmemo.settings"
+                             parentId="project.propVCSSupport.Mappings"
+                             instance="com.gitmemo.settings.GitMemoConfigurable"
+                             bundle="messages.GitMemoBundle"
+                             key="settings.title"/>
+
+        <vcsLogCommitStatusProvider implementation="com.gitmemo.log.GitNoteStatusProvider"/>
+
+        <toolWindow id="GitNotes"
+                    anchor="right"
+                    icon="AllIcons.General.Balloon"
+                    factoryClass="com.gitmemo.ui.GitNotesToolWindowFactory"/>
     </extensions>
+
+    <actions>
+        <group id="GitMemo.Log.Notes" text="Notes" popup="true">
+            <action id="GitMemo.EditNote"
+                    class="com.gitmemo.actions.EditGitNoteAction"
+                    text="Edit Note..."
+                    description="Edit the git note attached to the selected commit"/>
+            <action id="GitMemo.DeleteNote"
+                    class="com.gitmemo.actions.DeleteGitNoteAction"
+                    text="Delete Note"
+                    description="Delete the git note attached to the selected commit"/>
+            <action id="GitMemo.CopyNote"
+                    class="com.gitmemo.actions.CopyGitNoteAction"
+                    text="Copy Note"
+                    description="Copy the git note of the selected commit to the clipboard"/>
+            <separator/>
+            <action id="GitMemo.FetchNotes"
+                    class="com.gitmemo.actions.FetchGitNotesAction"
+                    text="Fetch Notes"
+                    description="Fetch the notes refs from the remote"/>
+            <action id="GitMemo.PushNotes"
+                    class="com.gitmemo.actions.PushGitNotesAction"
+                    text="Push Notes"
+                    description="Push the notes refs to the remote"/>
+            <add-to-group group-id="Vcs.Log.ContextMenu" anchor="last"/>
+        </group>
+    </actions>
 </idea-plugin>
