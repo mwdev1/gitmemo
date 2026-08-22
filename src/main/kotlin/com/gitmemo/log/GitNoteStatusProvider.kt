@@ -18,12 +18,15 @@ import java.awt.event.InputEvent
 import javax.swing.Icon
 
 /**
- * The note attached to a commit.
+ * The note attached to a commit, or the absence of one when [note] is `null`.
+ *
+ * A status is reported for every commit, not just annotated ones, so the details panel can also offer
+ * to create a note where there is none.
  *
  * [commit] is carried along because `getPresentation` only receives the status, and the presentation
  * needs to know which commit to edit when clicked.
  */
-internal class GitNoteStatus(val commit: CommitId, val note: String) : VcsCommitExternalStatus
+internal class GitNoteStatus(val commit: CommitId, val note: String?) : VcsCommitExternalStatus
 
 /**
  * Surfaces git notes in the commit details panel of the VCS Log.
@@ -31,6 +34,8 @@ internal class GitNoteStatus(val commit: CommitId, val note: String) : VcsCommit
  * `CommitDetailsPanel` turns each presentation into an action inside an icon-only toolbar, so all we
  * can show here is an icon whose tooltip is the note; clicking it opens the editor. The full body is
  * readable in the Git Notes tool window.
+ *
+ * Commits without a note get an icon too, so a note can be created from the same place it is read.
  *
  * No cache invalidation hook is needed: the platform's `ExternalStatusesAsyncLoader` re-runs the
  * loader on every commit selection change.
@@ -73,8 +78,7 @@ internal class GitNoteStatusProvider : VcsCommitExternalStatusProvider<GitNoteSt
         for (commit in rootCommits) {
           if (disposed) return result
           val hash = commit.hash.asString()
-          if (hash !in annotated) continue
-          val note = service.readNote(root, hash) ?: continue
+          val note = if (hash in annotated) service.readNote(root, hash) else null
           result[commit] = GitNoteStatus(commit, note)
         }
       }
@@ -91,16 +95,18 @@ internal class GitNoteStatusProvider : VcsCommitExternalStatusProvider<GitNoteSt
     private val status: GitNoteStatus,
   ) : VcsCommitExternalStatusPresentation.Clickable {
 
-    override val icon: Icon get() = AllIcons.General.Balloon
+    /** A distinct icon for "no note yet", so the toolbar reads as "add one" rather than "read one". */
+    override val icon: Icon
+      get() = if (status.note == null) AllIcons.General.Add else AllIcons.General.Balloon
 
     override val text: String
-      get() = GitMemoBundle.message(
-        "status.presentation.text",
-        StringUtil.shortenTextWithEllipsis(status.note, 120, 0, true),
-      )
+      get() = status.note?.let {
+        GitMemoBundle.message("status.presentation.text", StringUtil.shortenTextWithEllipsis(it, 120, 0, true))
+      } ?: GitMemoBundle.message("status.presentation.addNote")
 
     override fun onClick(e: InputEvent?): Boolean {
-      GitNoteEditing.editNote(project, status.commit.root, status.commit.hash.asString(), status.note)
+      // The body is already known — empty when there is no note — so the dialog opens without a read.
+      GitNoteEditing.editNote(project, status.commit.root, status.commit.hash.asString(), status.note.orEmpty())
       return true
     }
   }
