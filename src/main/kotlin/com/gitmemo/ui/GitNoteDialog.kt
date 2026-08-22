@@ -55,6 +55,9 @@ internal class GitNoteDialog(
   init {
     title = GitMemoBundle.message("dialog.edit.title", shortHash)
     setOKButtonText(GitMemoBundle.message("panel.save"))
+    // "Close" rather than "Cancel": the dialog is as much a reader as an editor, so dismissing it is
+    // the normal way out and not an abandoned edit.
+    setCancelButtonText(GitMemoBundle.message("dialog.edit.close"))
     init()
 
     // Swing only re-reads an Action's enabled state from the "enabled" property change it fires, so
@@ -103,8 +106,12 @@ internal class GitNoteDialog(
   }
 
   /**
-   * Hands the note being edited to Claude Code. Deliberately not a [DialogWrapper] action that
-   * closes: sending is a side trip, and the user still has to decide whether to save.
+   * Hands the note being edited to Claude Code and then closes, since the user's attention moves to
+   * the terminal.
+   *
+   * Closing goes through Close rather than Save, so an unsaved edit is discarded — the body is handed
+   * to Claude, not written to git. The send itself is fire-and-forget and already holds its own copy
+   * of the text, so it survives the dialog going away.
    */
   private inner class SendToClaudeCodeAction :
     AbstractAction(GitMemoBundle.message("dialog.edit.sendToClaude")) {
@@ -116,6 +123,7 @@ internal class GitNoteDialog(
 
     override fun actionPerformed(e: ActionEvent) {
       ClaudeCodeSupport.sendNote(project, shortHash, notesRef, textArea.text)
+      doCancelAction()
     }
   }
 
