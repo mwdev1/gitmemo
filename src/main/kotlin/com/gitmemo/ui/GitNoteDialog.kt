@@ -41,6 +41,14 @@ internal class GitNoteDialog(
   private val sendToClaudeAction =
     if (ClaudeCodeSupport.isAvailable()) SendToClaudeCodeAction() else null
 
+  /**
+   * `null` when the commit carries no note, so there is nothing to delete.
+   *
+   * Deliberately tied to the stored body rather than to the text area: the button removes what is in
+   * git, which typing in the dialog has not changed yet.
+   */
+  private val deleteAction = if (initialText.isNotBlank()) DeleteNoteAction() else null
+
   /** The edited body. Blank text means "remove the note". */
   val noteText: String get() = textArea.text
 
@@ -72,15 +80,27 @@ internal class GitNoteDialog(
   }
 
   /**
-   * The Claude Code button sits on the left so it reads as an auxiliary action rather than an
-   * alternative to Save.
+   * Delete and Claude Code sit on the left so they read as auxiliary actions rather than as
+   * alternatives to Save.
    */
   override fun createLeftSideActions(): Array<Action> =
-    listOfNotNull(sendToClaudeAction).toTypedArray()
+    listOfNotNull(deleteAction, sendToClaudeAction).toTypedArray()
 
   override fun getPreferredFocusedComponent(): JComponent = textArea
 
   override fun getDimensionServiceKey(): String = "com.gitmemo.ui.GitNoteDialog"
+
+  /**
+   * Closes the dialog with [DELETE_EXIT_CODE] once the user confirms.
+   *
+   * The removal itself is left to the caller, like saving is, so the git call stays off the EDT.
+   * Confirming before closing rather than after keeps the two dialogs from stacking up.
+   */
+  private inner class DeleteNoteAction : AbstractAction(GitMemoBundle.message("dialog.edit.delete")) {
+    override fun actionPerformed(e: ActionEvent) {
+      if (GitNoteEditing.confirmDelete(project, shortHash)) close(DELETE_EXIT_CODE)
+    }
+  }
 
   /**
    * Hands the note being edited to Claude Code. Deliberately not a [DialogWrapper] action that
@@ -97,5 +117,10 @@ internal class GitNoteDialog(
     override fun actionPerformed(e: ActionEvent) {
       ClaudeCodeSupport.sendNote(project, shortHash, notesRef, textArea.text)
     }
+  }
+
+  companion object {
+    /** Exit code telling the caller to remove the note instead of saving the edited body. */
+    const val DELETE_EXIT_CODE: Int = NEXT_USER_EXIT_CODE
   }
 }

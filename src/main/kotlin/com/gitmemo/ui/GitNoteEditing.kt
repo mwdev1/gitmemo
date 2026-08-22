@@ -7,6 +7,7 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.VcsNotifier
@@ -37,19 +38,20 @@ internal object GitNoteEditing {
 
   /** Removes the note on [hash], asking for confirmation first when [confirm] is set. */
   fun deleteNote(project: Project, root: VirtualFile, hash: String, confirm: Boolean = true) {
-    if (confirm) {
-      val answer = Messages.showYesNoDialog(
-        project,
-        GitMemoBundle.message("dialog.delete.message", shortHash(hash)),
-        GitMemoBundle.message("dialog.delete.title"),
-        Messages.getQuestionIcon(),
-      )
-      if (answer != Messages.YES) return
-    }
+    if (confirm && !confirmDelete(project, shortHash(hash))) return
     runInBackground(project, GitMemoBundle.message("progress.deletingNote")) {
       GitNotesService.getInstance(project).deleteNote(root, hash)
     }
   }
+
+  /** Asks whether the note on [shortHash] should really go, so every surface words it the same way. */
+  fun confirmDelete(project: Project, shortHash: String): Boolean =
+    Messages.showYesNoDialog(
+      project,
+      GitMemoBundle.message("dialog.delete.message", shortHash),
+      GitMemoBundle.message("dialog.delete.title"),
+      Messages.getQuestionIcon(),
+    ) == Messages.YES
 
   /** Writes [text] as the note on [hash]; blank text removes the note. */
   fun saveNote(project: Project, root: VirtualFile, hash: String, text: String) {
@@ -63,10 +65,15 @@ internal object GitNoteEditing {
   private fun showDialogAndSave(project: Project, root: VirtualFile, hash: String, current: String) {
     val service = GitNotesService.getInstance(project)
     val dialog = GitNoteDialog(project, shortHash(hash), service.notesRef, current)
-    if (!dialog.showAndGet()) return
-    val edited = dialog.noteText
-    if (edited == current) return
-    saveNote(project, root, hash, edited)
+    dialog.show()
+    when (dialog.exitCode) {
+      DialogWrapper.OK_EXIT_CODE -> {
+        val edited = dialog.noteText
+        if (edited != current) saveNote(project, root, hash, edited)
+      }
+      // The dialog already asked, so do not confirm twice.
+      GitNoteDialog.DELETE_EXIT_CODE -> deleteNote(project, root, hash, confirm = false)
+    }
   }
 
   /** Runs [body] on a background thread, reporting any [VcsException] as an error notification. */
