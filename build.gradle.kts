@@ -38,8 +38,16 @@ intellijPlatform {
             sinceBuild = "252.25557"
         }
 
+        // Shown in the "What's new" section of the listing: a short summary of this version only.
         changeNotes = """
-            Initial version
+            <ul>
+                <li>First release.</li>
+                <li>View, add, edit and delete git notes from the commit details panel, a Git Notes
+                    tool window and the Log context menu.</li>
+                <li>Fetch and push the notes refs.</li>
+                <li>Send a note to a Claude Code terminal session.</li>
+                <li>Configurable notes namespace.</li>
+            </ul>
         """.trimIndent()
     }
 

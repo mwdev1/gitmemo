@@ -1,117 +1,124 @@
-# IntelliJ Platform Plugin Template
+# gitmemo
 
-[![Twitter Follow](https://img.shields.io/badge/follow-%40JBPlatform-1DA1F2?logo=twitter)](https://twitter.com/JBPlatform)
-[![Developers Forum](https://img.shields.io/badge/JetBrains%20Platform-Join-blue)][jb:forum]
+An IntelliJ Platform plugin that brings **git notes** into the VCS Log along with Claude Code terminal integration.
 
-## Plugin template structure
 
-A generated project contains the following content structure:
+## Why
+
+Git notes live outside the commit object graph, so the bundled Git plugin does not surface them at
+all in the IDE by default.
+
+Using Git Notes you can address a common problem in AI-assisted development: when an AI agent produces a commit, the conversation that led to that change is typically lost. Team members see what changed but not why the AI was asked to change it, what alternatives were considered, or what constraints were given.
+
+The session transcript or handoff notes can be stored against a commit and easily resumed later or shared with other teammates.
+Useful for managing context in AI assisted development environment and keeping an audit trail for automated workflows.
+
+## Features
+
+**Note indicator in the commit details panel.** The balloon icon marks an annotated commit; hovering
+it previews the note.
+
+![The VCS Log with a note indicator and its tooltip in the commit details panel](docs/images/vcslogs.png)
+
+**Notes group in the Log context menu.** Right-click a commit → **Notes**.
+
+![The Notes submenu in the VCS Log context menu, showing Edit Note, Delete Note, Copy Note, Fetch Notes and Push Notes](docs/images/context_menu.png)
+
+**Note editor.** Shows the active notes ref, with *Send to Claude Code* alongside the usual save and
+delete actions.
+
+![The Git Note dialog editing a handoff note, with Delete, Send to Claude Code, Close and Save buttons](docs/images/dialog.png)
+
+## Requirements
+
+- A **local** `git` executable 
+- The Terminal plugin — only for the *Send to Claude Code* button
+
+## Install
+
+The plugin is not on the Marketplace yet, so build it from source:
+
+```bash
+./gradlew buildPlugin
+# → build/distributions/gitmemo-<version>.zip
+```
+
+Then in the IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…** and pick the zip.
+
+## Usage
+
+**Sharing notes.** *Fetch Notes* and *Push Notes* sync `refs/notes/*` with a remote — `origin` if it
+exists, otherwise the first configured remote. Note that this covers **every** notes namespace, not
+just the one configured in settings. The fetch is forced, because note refs legitimately move
+non-fast-forward; the push is not.
+
+## Settings
+
+**Settings → Version Control → Git Notes** has a single option, *Notes ref* — the namespace passed to
+`git notes --ref`. It defaults to git's own default, `refs/notes/commits`, and is stored per project.
+
+## Send to Claude Code
+
+The note editor has a *Send to Claude Code* button when the Terminal plugin is available. The Claude
+Code plugin itself is not required.
+
+What it does, precisely:
+
+1. Finds a running Claude Code session — the most recent `Claude Code` terminal tab, or a terminal
+   whose shell process (or one of its children) is `claude`. If there is none, it starts one and waits
+   up to 60 seconds for the session to come up.
+2. Types the note into the prompt as a bracketed-paste block, so a multi-line note arrives as one
+   message instead of being submitted line by line, and focuses the terminal.
+3. Closes the dialog **without saving**.
+
+The message is just the note, with a one-line header naming the commit and the notes ref:
 
 ```
-.
-├── .run/                   Predefined Run/Debug Configurations
-├── build/                  Output build directory
-├── gradle
-│   ├── wrapper/            Gradle Wrapper
-├── src                     Plugin sources
-│   ├── main
-│   │   ├── kotlin/         Kotlin production sources
-│   │   └── resources/      Resources - plugin.xml, icons, messages
-├── .gitignore              Git ignoring rules
-├── build.gradle.kts        Gradle build configuration
-├── gradle.properties       Gradle configuration properties
-├── gradlew                 *nix Gradle Wrapper script
-├── gradlew.bat             Windows Gradle Wrapper script
-├── README.md               README
-└── settings.gradle.kts     Gradle project settings
+Git note on commit <shortHash> (ref <notesRef>):
+
+<note body>
 ```
 
-In addition to the configuration files, the most crucial part is the `src` directory, which contains our implementation
-and the manifest for our plugin – [plugin.xml][file:plugin.xml].
+Two things worth knowing: the plugin **never presses Enter** — the text sits in the prompt so you can
+add to it or discard it — and since the dialog closes without saving, save the note first if you want
+to keep it.
 
-> [!NOTE]
-> To use Java in your plugin, create the `/src/main/java` directory.
+## Make notes survive amend and rebase
 
-## Plugin configuration file
+Git can carry notes over to rewritten commits, but it is off by default. Configure it once:
 
-The plugin configuration file is a [plugin.xml][file:plugin.xml] file located in the `src/main/resources/META-INF`
-directory.
-It provides general information about the plugin, its dependencies, extensions, and listeners.
+```bash
+git config --global notes.rewriteRef 'refs/notes/*'
+git config --global notes.rewriteMode concatenate
+git config --global notes.rewrite.amend true
+git config --global notes.rewrite.rebase true
+```
 
-You can read more about this file in the [Plugin Configuration File][docs:plugin.xml] section of our documentation.
+Verify with:
 
-If you're still not quite sure what this is all about, read our
-introduction: [What is the IntelliJ Platform?][docs:intro]
+```bash
+git config --global --get-regexp '^notes\.'
+```
 
-$H$H Predefined Run/Debug configurations
+`notes.rewriteRef` is the switch that actually enables rewriting — it has **no default value**, so
+without it the other three settings do nothing. It can be overridden for a single command with the
+`GIT_NOTES_REWRITE_REF` environment variable. Use `--local` instead of `--global` to scope the config
+to one repository.
 
-Within the default project structure, there is a `.run` directory provided containing predefined *Run/Debug
-configurations* that expose corresponding Gradle tasks:
+## Limitations
 
-| Configuration name | Description                                                                                                                                                                         |
-|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Run Plugin         | Runs [`:runIde`][gh:intellij-platform-gradle-plugin-runIde] IntelliJ Platform Gradle Plugin task. Use the *Debug* icon for plugin debugging.                                        |
-| Run Tests          | Runs [`:test`][gradle:lifecycle-tasks] Gradle task.                                                                                                                                 |
-| Run Verifications  | Runs [`:verifyPlugin`][gh:intellij-platform-gradle-plugin-verifyPlugin] IntelliJ Platform Gradle Plugin task to check the plugin compatibility against the specified IntelliJ IDEs. |
+- **Local git only.** `git notes` runs as a direct subprocess, so git executables reached through WSL
+  or Docker are not supported.
+- Fetch and push move all of `refs/notes/*`, not only the configured ref.
 
-> [!NOTE]
-> You can find the logs from the running task in the `idea.log` tab.
+## Development
 
-## Publishing the plugin
+```bash
+./gradlew runIde        # launch a sandbox IDE with the plugin (also the "Run IDE with Plugin" run config)
+./gradlew buildPlugin   # produce the installable zip
+./gradlew verifyPlugin  # run the JetBrains plugin verifier
+```
 
-> [!TIP]
-> Make sure to follow all guidelines listed in [Publishing a Plugin][docs:publishing] to follow all recommended and
-> required steps.
-
-Releasing a plugin to [JetBrains Marketplace](https://plugins.jetbrains.com) is a straightforward operation that uses
-the `publishPlugin` Gradle task provided by
-the [intellij-platform-gradle-plugin][gh:intellij-platform-gradle-plugin-docs].
-
-You can also upload the plugin to the [JetBrains Plugin Repository](https://plugins.jetbrains.com/plugin/upload)
-manually via UI.
-
-## Useful links
-
-- [IntelliJ Platform SDK Plugin SDK][docs]
-- [IntelliJ Platform Gradle Plugin Documentation][gh:intellij-platform-gradle-plugin-docs]
-- [IntelliJ Platform Explorer][jb:ipe]
-- [JetBrains Marketplace Quality Guidelines][jb:quality-guidelines]
-- [IntelliJ Platform UI Guidelines][jb:ui-guidelines]
-- [JetBrains Marketplace Paid Plugins][jb:paid-plugins]
-- [IntelliJ SDK Code Samples][gh:code-samples]
-
-[docs]: https://plugins.jetbrains.com/docs/intellij
-
-[docs:intro]: https://plugins.jetbrains.com/docs/intellij/intellij-platform.html?from=IJPluginTemplate
-
-[docs:plugin.xml]: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html?from=IJPluginTemplate
-
-[docs:publishing]: https://plugins.jetbrains.com/docs/intellij/publishing-plugin.html?from=IJPluginTemplate
-
-[file:plugin.xml]: ./src/main/resources/META-INF/plugin.xml
-
-[gh:code-samples]: https://github.com/JetBrains/intellij-sdk-code-samples
-
-[gh:intellij-platform-gradle-plugin]: https://github.com/JetBrains/intellij-platform-gradle-plugin
-
-[gh:intellij-platform-gradle-plugin-docs]: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
-
-[gh:intellij-platform-gradle-plugin-runIde]: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-tasks.html#runIde
-
-[gh:intellij-platform-gradle-plugin-verifyPlugin]: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-tasks.html#verifyPlugin
-
-[gradle:lifecycle-tasks]: https://docs.gradle.org/current/userguide/java_plugin.html#lifecycle_tasks
-
-[jb:github]: https://github.com/JetBrains/.github/blob/main/profile/README.md
-
-[jb:forum]: https://platform.jetbrains.com/
-
-[jb:quality-guidelines]: https://plugins.jetbrains.com/docs/marketplace/quality-guidelines.html
-
-[jb:paid-plugins]: https://plugins.jetbrains.com/docs/marketplace/paid-plugins-marketplace.html
-
-[jb:quality-guidelines]: https://plugins.jetbrains.com/docs/marketplace/quality-guidelines.html
-
-[jb:ipe]: https://jb.gg/ipe
-
-[jb:ui-guidelines]: https://jetbrains.github.io/ui
+The sandbox provisions the real Claude Code plugin, so the terminal hand-off can be exercised
+end-to-end during development. It is a sandbox-only dependency — nothing in this plugin compiles
+against it.

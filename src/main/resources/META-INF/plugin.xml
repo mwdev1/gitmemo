@@ -1,19 +1,41 @@
 <!-- Plugin Configuration File: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <id>com.gitmemo.notes</id>
-    <name>Git Notes</name>
-    <vendor>gitmemo</vendor>
+    <name>GitMemo</name>
+    <vendor url="https://github.com/mwdev1/gitmemo">gitmemo</vendor>
 
-    <description><![CDATA[
-        View, add, edit and delete <b>git notes</b> on commits, straight from the VCS Log.<br><br>
-        Git notes live outside the commit object graph, so the bundled Git plugin does not surface them
-        at all. This plugin adds:
+    <!-- Marketplace listing rules apply here (https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html):
+         the first 40 characters must be an English summary, so the opening sentence stays plain text
+         with no markup; screenshots belong in the Media section of the plugin's admin page, not in
+         this description. -->
+    <description><![CDATA[View, add, edit and delete git notes on commits, from the VCS Log.
+        <p>
+            Git notes attach text to a commit that already exists, without rewriting it. The IDE does
+            not display them anywhere by default. This plugin makes them part of the Log:
+        </p>
         <ul>
-            <li>a note indicator in the commit details panel of the Log, which opens an editor when clicked;</li>
+            <li>a note indicator in the commit details panel, showing the note as its tooltip and
+                opening an editor when clicked;</li>
             <li>a <b>Git Notes</b> tool window that follows the Log selection and edits notes inline;</li>
-            <li><b>Notes</b> actions in the Log context menu, including fetch and push of the notes refs;</li>
-            <li>a configurable notes namespace, for reviews or other custom refs.</li>
+            <li>a <b>Notes</b> group in the Log context menu to edit, delete or copy a note, and to
+                fetch and push the notes refs;</li>
+            <li><b>Send to Claude Code</b>, which types a note into a Claude Code terminal session as
+                context and leaves it unsent for you to review;</li>
+            <li>a configurable notes namespace, so notes can be kept under
+                <code>refs/notes/review</code> or any other ref.</li>
         </ul>
+        <p>
+            One use is recording why a change was made when a coding agent produced the commit.
+            Handoff notes, constraints and the session reference live on the commit itself, so they
+            stay in the history and can be shared with the rest of the team.
+        </p>
+        <p>
+            Requires a local <code>git</code> executable; git reached through WSL or Docker is not
+            supported. <b>Send to Claude Code</b> additionally requires the Terminal plugin.
+        </p>
+        <p>
+            <a href="https://github.com/mwdev1/gitmemo">Source code and issue tracker</a>
+        </p>
     ]]></description>
 
     <depends>com.intellij.modules.vcs</depends>
